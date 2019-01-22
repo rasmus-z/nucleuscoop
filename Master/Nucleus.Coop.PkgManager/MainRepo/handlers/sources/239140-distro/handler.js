@@ -7,6 +7,7 @@ Game.AddOption("Save ID - Player 3", "Save ID to use for Player 3 (default 2)",
 Game.AddOption("Save ID - Player 4", "Save ID to use for Player 4 (default 3)",
     "saveid3", 3);
 
+Game.PlatformVersion = 10; // Nucleus Coop 10
 Game.SteamID = "239140";
 Game.GameID = "239140";
 Game.GameName = "Dying Light";
@@ -22,7 +23,7 @@ Game.SaveType = SaveType.SCR;
 Game.SupportsPositioning = true;
 Game.HideTaskbar = true;
 Game.Hook.ForceFocus = true;
-Game.Hook.ForceFocusWindowName = "Dying Light";
+Game.Hook.ForceFocusWindowRegex = "Dying Light";
 Game.Hook.DInputEnabled = false;
 Game.Hook.XInputEnabled = true;
 Game.Hook.XInputReroute = false;// true; // this is beta
@@ -31,7 +32,7 @@ Game.Hook.XInputNames = ["xinput1_3.dll"];
 Game.OnPlay.Callback(function () {
     var savePath = Context.GetFolder(Folder.Documents) + "\\DyingLight\\out\\settings\\video.scr";
     Context.ModifySaveFile(savePath, savePath, SaveType.SCR, [
-        Context.NewScrSaveInfo("Resolution", Context.Width, Context.Height),
+        Context.NewSaveInfo("Resolution", Context.Width, Context.Height),
         //Context.NewSaveInfo("Fullscreen", false),
     ]); 
 

@@ -7,6 +7,7 @@ Game.AddOption("Save ID - Player 3", "Save ID to use for Player 3 (default 2)",
 Game.AddOption("Save ID - Player 4", "Save ID to use for Player 4 (default 3)",
     "saveid3", 3);
 
+Game.PlatformVersion = 10; // Nucleus Coop 10
 Game.SteamID = "261640";
 Game.GameID = "261640";
 Game.GameName = "Borderlands Pre-Sequel";
@@ -18,31 +19,32 @@ Game.ExecutableName = "borderlandspresequel.exe";
 Game.SteamID = "261640";
 Game.MaxPlayers = 4;
 Game.MaxPlayersOneMonitor = 4;
-Game.BinariesFolder = "binaries\\win32";
+Game.ExecutablePath = "binaries\\win32";
 Game.NeedsSteamEmulation = false;
 Game.LauncherTitle = "splashscreen";
 Game.SaveType = SaveType.INI;
 Game.SupportsPositioning = true;
 Game.HideTaskbar = true;
 Game.Hook.ForceFocus = true;
-Game.Hook.ForceFocusWindowName = "Borderlands: The Pre-Sequel (32-bit, DX9)";
+Game.Hook.ForceFocusWindowRegex = "Borderlands: The Pre-Sequel";
 Game.Hook.DInputEnabled = false;
 Game.Hook.XInputEnabled = true;
-Game.Hook.XInputReroute = false;// true; // this is beta
+Game.Hook.XInputReroute = false;// true; // this is beta/not working at all probably
 Game.Hook.XInputNames = ["xinput1_3.dll"];
+Game.Hook.RemoveTitleBar = true; // remove the 21 height from the size of the application
 
 Game.OnPlay.Callback(function () {
     var savePath = Context.GetFolder(Folder.Documents) + "\\My Games\\Borderlands The Pre-Sequel\\WillowGame\\Config\\WillowEngine.ini";
     Context.ModifySaveFile(savePath, savePath, SaveType.INI, [
-       Context.NewIniSaveInfo("SystemSettings", "WindowedFullscreen", Context.IsFullscreen),
-       Context.NewIniSaveInfo("SystemSettings", "ResX", Context.Width),
-       Context.NewIniSaveInfo("SystemSettings", "ResY", Context.Height),
-       Context.NewIniSaveInfo("SystemSettings", "Fullscreen", false),
-       Context.NewIniSaveInfo("Engine.Engine", "bPauseOnLossOfFocus", false),
-       Context.NewIniSaveInfo("WillowGame.WillowGameEngine", "bPauseLostFocusWindowed", false),
-       Context.NewIniSaveInfo("Engine.Engine", "bMuteAudioWhenNotInFocus", false),
-       Context.NewIniSaveInfo("Engine.Engine", "bPauseOnLossOfFocus", false),
-       Context.NewIniSaveInfo("WillowGame.WillowGameEngine", "bMuteAudioWhenNotInFocus", false),
+       Context.NewSaveInfo("SystemSettings", "WindowedFullscreen", Context.IsFullscreen),
+       Context.NewSaveInfo("SystemSettings", "ResX", Context.Width),
+       Context.NewSaveInfo("SystemSettings", "ResY", Context.Height),
+       Context.NewSaveInfo("SystemSettings", "Fullscreen", false),
+       Context.NewSaveInfo("Engine.Engine", "bPauseOnLossOfFocus", false),
+       Context.NewSaveInfo("WillowGame.WillowGameEngine", "bPauseLostFocusWindowed", false),
+       Context.NewSaveInfo("Engine.Engine", "bMuteAudioWhenNotInFocus", false),
+       Context.NewSaveInfo("Engine.Engine", "bPauseOnLossOfFocus", false),
+       Context.NewSaveInfo("WillowGame.WillowGameEngine", "bMuteAudioWhenNotInFocus", false),
     ]);
 
     var playerStr = "saveid" + Context.PlayerID;

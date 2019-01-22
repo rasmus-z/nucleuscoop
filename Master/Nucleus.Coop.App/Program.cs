@@ -7,17 +7,19 @@ using System.Drawing;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Nucleus.Gaming.Coop;
-using Squirrel;
 using System.Threading;
+using Nucleus.Coop.App.Forms;
+using Nucleus.Gaming.Coop.Interop;
 
 namespace Nucleus.Coop
 {
     static class Program
     {
         [STAThread]
-        static void Main(string[] args)
-        {
+        static void Main(string[] args) {
             new Log(true);
+
+            ThreadUtil.Initialize();
 
             // Add the event handler for handling UI thread exceptions to the event.
             Application.ThreadException += new ThreadExceptionEventHandler(ThreadExceptionEventHandler);
@@ -30,29 +32,37 @@ namespace Nucleus.Coop
             AppDomain.CurrentDomain.UnhandledException += new UnhandledExceptionEventHandler(UnhandledExceptionEventHandler);
 
             // initialize DPIManager BEFORE setting 
-            // the application to be DPI aware
+            // the application to be DPI aware,
+            // or else Windows will give us pre-scaled monitor sizes
             DPIManager.PreInitialize();
             User32Util.SetProcessDpiAwareness(ProcessDPIAwareness.ProcessPerMonitorDPIAware);
 
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            MainForm form = new MainForm(args);
-            DPIManager.AddForm(form);
-            DPIManager.ForceUpdate();
+            GameManager gameManager = new GameManager();
+
+            StartMainForm(args, gameManager);
+        }
+
+        private static void StartMainForm(string[] args, GameManager gameManager)
+        {
+            MainForm form = new MainForm(args, gameManager);
 
             Application.Run(form);
         }
 
+#if DEBUG
         private static void ThreadExceptionEventHandler(object sender, ThreadExceptionEventArgs e)
         {
-            int x = 0;
+            System.Diagnostics.Debugger.Break();
         }
 
         private static void UnhandledExceptionEventHandler(object sender, UnhandledExceptionEventArgs e)
         {
-            int x = 0;
+            System.Diagnostics.Debugger.Break();
         }
+#endif
     }
 
 

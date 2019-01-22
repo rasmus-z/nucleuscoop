@@ -11,10 +11,8 @@ using System.Linq;
 using System.Text;
 using System.Windows.Forms;
 
-namespace Nucleus.Gaming
-{
-    public class JSUserInputControl : UserInputControl
-    {
+namespace Nucleus.Gaming.App.Controls {
+    public class JSUserInputControl : UserInputControl {
         private bool canProceed;
         private bool canPlay;
 
@@ -70,6 +68,7 @@ namespace Nucleus.Gaming
                 ControlListBox list = new ControlListBox();
                 list.Size = this.Size;
                 list.AutoScroll = true;
+                list.SelectedChanged += List_SelectedChanged;
 
                 Controls.Add(list);
 
@@ -86,7 +85,8 @@ namespace Nucleus.Gaming
 
                     CoolListControl control = new CoolListControl(true);
                     control.Anchor = AnchorStyles.Left | AnchorStyles.Top | AnchorStyles.Right;
-                    control.BackColor = Color.FromArgb(30, 30, 30);
+                    control.BackColor = Color.FromArgb(54, 57, 63);
+
                     control.Size = new Size(list.Width, 120);
                     control.Data = val;
                     control.OnSelected += Control_OnSelected;
@@ -103,7 +103,6 @@ namespace Nucleus.Gaming
                     if (value.TryGetValue("Details", out detailsObj))
                     {
                         details = detailsObj.ToString();
-
                         control.Details = details;
                     }
 
@@ -131,16 +130,22 @@ namespace Nucleus.Gaming
             }
             else
             {
-                
+            }
+        }
+
+        private void List_SelectedChanged(Control selected) {
+            if (selected is CoolListControl) {
+                CoolListControl list = (CoolListControl)selected;
+                profile.Options[CustomStep.Option.Key] = list.Data;
+
+                canProceed = true;
+                CanPlayUpdated(true, true);
             }
         }
 
         private void Control_OnSelected(object obj)
         {
-            profile.Options[CustomStep.Option.Key] = obj;
-
-            canProceed = true;
-            CanPlayUpdated(true, true);
+            
         }
     }
 }

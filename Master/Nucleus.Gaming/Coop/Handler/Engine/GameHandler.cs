@@ -1,20 +1,17 @@
-﻿using Nucleus.Gaming.Coop.Handler.Cursor;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading;
 
-namespace Nucleus.Gaming.Coop.Handler
-{
+namespace Nucleus.Gaming.Coop.Handler {
     /// <summary>
     /// Base class that loads modules based on their need
     /// </summary>
-    public class GameHandler
-    {
-        private UserGameInfo _userGame;
-        private GameProfile _profile;
-        private HandlerDataManager _handlerManager;
+    public class GameHandler {
+        private UserGameInfo userGame;
+        private GameProfile profile;
+        private HandlerDataManager handlerManager;
 
         private List<HandlerModule> modules;
 
@@ -28,30 +25,24 @@ namespace Nucleus.Gaming.Coop.Handler
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public T GetModule<T>()
-        {
-            for (int i = 0; i < modules.Count; i++)
-            {
+        public T GetModule<T>() {
+            for (int i = 0; i < modules.Count; i++) {
                 object module = modules[i];
-                if (module is T)
-                {
+                if (module is T) {
                     return (T)module;
                 }
             }
             return default(T);
         }
 
-        public bool Initialize(HandlerDataManager handlerManager, UserGameInfo userGameInfo, GameProfile profile)
-        {
-            this._handlerManager = handlerManager;
-            this._userGame = userGameInfo;
-            this._profile = profile;
+        public bool Initialize(HandlerDataManager handlerManager, UserGameInfo userGameInfo, GameProfile profile) {
+            this.handlerManager = handlerManager;
+            this.userGame = userGameInfo;
+            this.profile = profile;
 
             modules = new List<HandlerModule>();
-            foreach (ModuleInfo info in GameManager.Instance.ModuleManager.Modules)
-            {
-                if (info.IsNeeded(handlerManager.HandlerData))
-                {
+            foreach (ModuleInfo info in GameManager.Instance.ModuleManager.Modules) {
+                if (info.IsNeeded(handlerManager.HandlerData)) {
                     modules.Add((HandlerModule)Activator.CreateInstance(info.ModuleType));
                 }
             }
@@ -59,73 +50,70 @@ namespace Nucleus.Gaming.Coop.Handler
             // order modules
             modules = modules.OrderBy(c => c.Order).ToList();
 
-            for (int i = 0; i < modules.Count; i++)
-            {
+            for (int i = 0; i < modules.Count; i++) {
                 modules[i].Initialize(this, handlerManager.HandlerData, userGameInfo, profile);
             }
 
             return true;
         }
 
-        public RequestResult<string> Play()
-        {
-            List<PlayerInfo> players = _profile.PlayerData;
-            for (int i = 0; i < players.Count; i++)
-            {
-                players[i].PlayerID = i;
+        public RequestResult<string> Play() {
+            List<PlayerInfo> players = profile.PlayerData;
+            // if there's a keyboard player, re-order play list
+            bool hasKeyboardPlayer = players.Any(c => c.IsKeyboardPlayer);
+            if (hasKeyboardPlayer) {
+                if (handlerManager.HandlerData.KeyboardPlayerFirst) {
+                    players.Sort((x, y) => y.IsKeyboardPlayer.CompareTo(x.IsKeyboardPlayer));
+                } else {
+                    players.Sort((x, y) => x.IsKeyboardPlayer.CompareTo(y.IsKeyboardPlayer));
+                }
             }
 
-            var result = new RequestResult<string>();
+            for (int i = 0; i < players.Count; i++) {
+                players[i].PlayerID = i;
+            }
+            RequestResult<String> result = new RequestResult<String>();
 
-            for (int i = 0; i < modules.Count; i++)
-            {
+            for (int i = 0; i < modules.Count; i++) {
                 modules[i].PrePlay();
             }
 
-            for (int i = 0; i < players.Count; i++)
-            {
+            for (int i = 0; i < players.Count; i++) {
                 PlayerInfo player = players[i];
 
-                HandlerContext context = _handlerManager.HandlerData.CreateContext(_profile, player);
+                HandlerContext context = handlerManager.HandlerData.CreateContext(profile, player, hasKeyboardPlayer);
                 context.PlayerID = player.PlayerID;
 
-                for (int j = 0; j < modules.Count; j++)
-                {
+                for (int j = 0; j < modules.Count; j++) {
                     modules[j].PrePlayPlayer(player, i, context);
                 }
 
-                _handlerManager.Play(context, player);
+                handlerManager.Play(context, player);
 
-                for (int j = 0; j < modules.Count; j++)
-                {
+                for (int j = 0; j < modules.Count; j++) {
                     modules[j].PlayPlayer(player, i, context);
                 }
 
-                Thread.Sleep(TimeSpan.FromMilliseconds(_handlerManager.HandlerData.PauseBetweenStarts));
+                Thread.Sleep(TimeSpan.FromMilliseconds(handlerManager.HandlerData.PauseBetweenStarts));
             }
 
             return result;
         }
 
-        public void Tick(double delayMs)
-        {
-            List<PlayerInfo> players = _profile.PlayerData;
-            for (int i = 0; i < players.Count; i++)
-            {
+        public void Tick(double delayMs) {
+            List<PlayerInfo> players = profile.PlayerData;
+            for (int i = 0; i < players.Count; i++) {
                 PlayerInfo player = players[i];
 
             }
 
-            for (int j = 0; j < modules.Count; j++)
-            {
+            for (int j = 0; j < modules.Count; j++) {
                 modules[j].Tick(delayMs);
             }
         }
 
-        public void End()
-        {
-            if (Ended != null)
-            {
+        public void End() {
+            if (Ended != null) {
                 Ended();
             }
         }

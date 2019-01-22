@@ -19,6 +19,8 @@ namespace Nucleus.Gaming.Coop
 
         public string JsCode { get; set; }
 
+        public int PlatformVersion { get; set; }
+
         public string[] DirSymlinkExclusions { get; set; }
         public string[] FileSymlinkExclusions { get; set; }
         public string[] FileSymlinkCopyInstead { get; set; }
@@ -29,7 +31,9 @@ namespace Nucleus.Gaming.Coop
         public bool ForceFinishOnPlay { get; set; } = true;
 
         /// <summary>
-        /// The interval in milliseconds the Handler should be updated at. Set it to 0 to disable updating (will lose all functionality that depends on ticks).
+        /// The interval in milliseconds the Handler should be updated at. 
+        /// Set it to 0 to disable updating 
+        /// (will lose all functionality that depends on ticks).
         /// </summary>
         public double HandlerInterval { get; set; } = 1000;
 
@@ -40,12 +44,13 @@ namespace Nucleus.Gaming.Coop
 
         /// <summary>
         /// If SymlinkGame is enabled, if we should copy or symbolic link the game executable
+        /// (solves some conflicts).
         /// </summary>
         public bool SymlinkExe { get; set; }
 
         /// <summary>
         /// If we should symbolic link the game's files to a temporary directory. 
-        /// If not will launch straight from installation directory.
+        /// If not, will launch straight from installation directory.
         /// </summary>
         public bool SymlinkGame { get; set; }
 
@@ -56,17 +61,17 @@ namespace Nucleus.Gaming.Coop
         public bool HardcopyGame { get; set; }
 
         /// <summary>
-        /// NOT WORKING ATM. If the game has keyboard support.
+        /// If the game has keyboard support.
         /// </summary>
         public bool SupportsKeyboard { get; set; }
 
         /// <summary>
-        /// Array with the name of other files found in the executable's folder (so we dont confuse different games with similar file names)
+        /// Array with the name of other files found in the executable's folder (so we dont confuse different games with similar file names).
         /// </summary>
         public string[] ExecutableContext { get; set; }
 
         /// <summary>
-        /// The name of the application executable with the extension (all lowercase)
+        /// The name of the application executable with the extension (all lowercase).
         /// </summary>
         public string ExecutableName { get; set; }
 
@@ -81,14 +86,14 @@ namespace Nucleus.Gaming.Coop
         public string GameID { get; set; }
 
         /// <summary>
-        /// Maximum amount of players this game supports.
+        /// Maximum amount of players this game supports (any possible configuration).
         /// </summary>
         public int MaxPlayers { get; set; }
 
         /// <summary>
-        /// Pause between game starts in milliseconds.
+        /// Pause between game starts in milliseconds (defaults to 1000).
         /// </summary>
-        public double PauseBetweenStarts { get; set; }
+        public double PauseBetweenStarts { get; set; } = 1000;
 
         /// <summary>
         /// The way the games handles DPI scaling. Modify this if the game is presenting different sizing behaviour after the Windows 10 Creators Update.
@@ -97,17 +102,17 @@ namespace Nucleus.Gaming.Coop
 
         /// <summary>
         /// Relative path to the executable file from the root of the game installation 
-        /// (essential for games where the executable ends up in a child binaries folder)
+        /// (essential for games where the executable ends up in a child binaries folder).
         /// </summary>
         public string ExecutablePath { get; set; }
 
         /// <summary>
-        /// Relative path to where the games starts in
+        /// Relative path to where the games starts in.
         /// </summary>
         public string WorkingFolder { get; set; }
 
         /// <summary>
-        /// Array of mutexes to kill before starting the next game process
+        /// Array of mutexes to kill before starting the next game process.
         /// </summary>
         public string[] KillMutex { get; set; }
 
@@ -122,18 +127,21 @@ namespace Nucleus.Gaming.Coop
         public string LauncherTitle { get; set; }
 
         /// <summary>
-        /// Callback events that should be called right before the game instance starts playing
+        /// Callback events that should be called right before the game instance starts playing.
         /// </summary>
         public CallbackData OnPlay { get; set; } = new CallbackData();
 
         /// <summary>
-        /// List with all the additional custom steps the handler could've added
+        /// List with all the additional custom steps the handler could've added.
         /// </summary>
         public List<CustomStep> CustomSteps { get; set; } = new List<CustomStep>();
 
-        public bool LockMouse { get; set; }
-
+        /// <summary>
+        /// Additional pre-loaded information available to the handler
+        /// </summary>
         public Dictionary<string, string> AdditionalData { get; set; } = new Dictionary<string, string>();
+
+        public bool KeyboardPlayerFirst { get; set; }
 
         /// <summary>
         /// Adds an additional step to the Custom Steps list dependent on the data from a GameOption
@@ -172,9 +180,9 @@ namespace Nucleus.Gaming.Coop
         /// Clones this Game Info into a new Generic Context
         /// </summary>
         /// <returns></returns>
-        public virtual HandlerContext CreateContext(GameProfile profile, PlayerInfo info)
+        public virtual HandlerContext CreateContext(GameProfile profile, PlayerInfo info, bool hasKeyboardPlayer)
         {
-            HandlerContext context = new HandlerContext(profile, info);
+            HandlerContext context = new HandlerContext(profile, info, hasKeyboardPlayer);
             ObjectUtil.DeepCopy(this, context);
 
             return context;

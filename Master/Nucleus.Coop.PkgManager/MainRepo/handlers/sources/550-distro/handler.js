@@ -98,6 +98,7 @@ Game.FileSymlinkExclusions = [
     "config.cfg"
 ];
 
+Game.PlatformVersion = 10; // Nucleus Coop 10
 Game.SteamID = "550";
 Game.GameID = "550";
 Game.HandlerInterval = 100; // 10 FPS handler
@@ -115,7 +116,7 @@ Game.StartArguments = "-novid -insecure -window";
 Game.MaxPlayersOneMonitor = 8;
 Game.MaxPlayers = 8;
 Game.Hook.ForceFocus = true;
-Game.Hook.ForceFocusWindowName = "Left 4 Dead 2";
+Game.Hook.ForceFocusWindowRegex = "Left 4 Dead 2";
 Game.Hook.DInputEnabled = false;
 Game.Hook.DInputForceDisable = true;
 Game.Hook.XInputEnabled = true;
@@ -128,20 +129,19 @@ Game.DPIHandling = DPIHandling.InvScaled;
 Game.OnPlay.Callback(function () {
     // Only enable setting the window size on the XInput hook dll
     // when its dual vertical, as it doenst work 100% of the time on DualHorizontal
-    Context.Hook.SetWindowSize = Player.Owner.IsDualVertical();
-    Context.Hook.ForceFocus = !Player.IsKeyboardPlayer;
-
+    //Context.Hook.SetWindowSize = Player.Owner.IsDualVertical();
+    //Context.Hook.ForceFocus = !Player.IsKeyboardPlayer;
     var saveSrc = Context.CombinePath(Context.InstallFolder, "left4dead2\\cfg\\video.txt");
     var savePath = Context.CombinePath(Context.InstanceFolder, "left4dead2\\cfg\\video.txt");
     Context.ModifySaveFile(saveSrc, savePath, SaveType.CFG, [
-        Context.NewCfgSaveInfo("config", "setting.fullscreen", "0"),
-        Context.NewCfgSaveInfo("config", "setting.defaultres", Math.max(640, Context.Width)),
-        Context.NewCfgSaveInfo("config", "setting.defaultresheight", Math.max(360, Context.Height)),
-        Context.NewCfgSaveInfo("config", "setting.nowindowborder", "0"),
-        Context.NewCfgSaveInfo("VideoConfig", "setting.fullscreen", "0"),
-        Context.NewCfgSaveInfo("VideoConfig", "setting.defaultres", Math.max(640, Context.Width)),
-        Context.NewCfgSaveInfo("VideoConfig", "setting.defaultresheight", Math.max(360, Context.Height)),
-        Context.NewCfgSaveInfo("VideoConfig ", "setting.nowindowborder", "0"),
+        Context.NewSaveInfo("config", "setting.fullscreen", "0"),
+        Context.NewSaveInfo("config", "setting.defaultres", Math.max(640, Context.Width)),
+        Context.NewSaveInfo("config", "setting.defaultresheight", Math.max(360, Context.Height)),
+        Context.NewSaveInfo("config", "setting.nowindowborder", "0"),
+        Context.NewSaveInfo("VideoConfig", "setting.fullscreen", "0"),
+        Context.NewSaveInfo("VideoConfig", "setting.defaultres", Math.max(640, Context.Width)),
+        Context.NewSaveInfo("VideoConfig", "setting.defaultresheight", Math.max(360, Context.Height)),
+        Context.NewSaveInfo("VideoConfig ", "setting.nowindowborder", "0"),
     ]);
 
     //copy config.cfg

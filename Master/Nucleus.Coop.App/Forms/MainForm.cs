@@ -1,9 +1,12 @@
 ﻿using Newtonsoft.Json;
+using Nucleus.Coop.App.Controls;
 using Nucleus.Coop.Controls;
 using Nucleus.Gaming;
 using Nucleus.Gaming.Coop;
 using Nucleus.Gaming.Coop.Handler;
+using Nucleus.Gaming.Coop.Interop;
 using Nucleus.Gaming.Package;
+using Nucleus.Gaming.Platform.Windows;
 using Nucleus.Gaming.Windows;
 using Nucleus.Gaming.Windows.Interop;
 using System;
@@ -13,242 +16,343 @@ using System.Drawing;
 using System.IO;
 using System.Threading;
 using System.Windows.Forms;
+using System.Linq;
 
-namespace Nucleus.Coop
-{
+namespace Nucleus.Coop.App.Forms {
     /// <summary>
     /// Central UI class to the Nucleus Coop application
     /// </summary>
-    public partial class MainForm : BaseForm
-    {
-        private int currentStepIndex;
-        private bool formClosing;
-
+    public partial class MainForm : BaseForm {
         private GameManager gameManager;
-        private Dictionary<UserGameInfo, GameControl> controls;
-
-        private SearchDisksForm form;
-
-        private GameControl selectedControl;
-
-        private GameHandlerMetadata selectedHandler;
-        private HandlerDataManager handlerDataManager;
-        private HandlerData handlerData;
-        //private GenericGameHandler handler;
-        private GameHandler handler;
-
-        private GameProfile currentProfile;
-        private bool noGamesPresent;
-        private List<UserInputControl> stepsList;
-        private UserInputControl currentStep;
-
-        private PositionsControl positionsControl;
-        private PlayerOptionsControl optionsControl;
-        private JSUserInputControl jsControl;
-
-        private Thread handlerThread;
-        private CoopConfigInfo configFile;
-
+        private Dictionary<string, GameControl> controls;
         private GameRunningOverlay overlay;
 
-        private GameHandlerMetadata[] currentHandlers;
+        private AppPage appPage = AppPage.None;
+        private bool noGamesPresent;
 
-        public MainForm(string[] args)
-        {
+        protected override Size DefaultSize {
+            get {
+                return new Size(1070, 740);
+            }
+        }
+
+        public GamePageBrowserControl BrowserBtns {
+            get { return this.gamePageBrowserControl; }
+        }
+
+        public static MainForm Instance { get; private set; }
+
+        public GameControl Selected { get; private set; }
+
+        private GameControl pkgManagerBtn;
+        private BasePageControl currentPage;
+
+        public MainForm(string[] args, GameManager gameManager) {
+            this.gameManager = gameManager;
+            MainForm.Instance = this;
+
             InitializeComponent();
+
+            this.SetupBaseForm(this.panel_formContent);
 
             overlay = new GameRunningOverlay();
             overlay.OnStop += Overlay_OnStop;
 
-            this.Text = string.Format("Nucleus Coop v{0}", Globals.Version);
+            this.titleBarControl.Text = string.Format("Nucleus Coop v{0}", Globals.Version);
 
-            controls = new Dictionary<UserGameInfo, GameControl>();
-
-            configFile = new CoopConfigInfo("config.json");
-            gameManager = new GameManager(configFile);
-
-            positionsControl = new PositionsControl();
-            optionsControl = new PlayerOptionsControl();
-            jsControl = new JSUserInputControl();
-
-            positionsControl.OnCanPlayUpdated += StepCanPlay;
-            optionsControl.OnCanPlayUpdated += StepCanPlay;
-            jsControl.OnCanPlayUpdated += StepCanPlay;
+            controls = new Dictionary<string, GameControl>();
 
             // selects the list of games, so the buttons look equal
-            list_Games.Select();
-            list_Games.AutoScroll = false;
-            list_Games.SelectedChanged += list_Games_SelectedChanged;
-            //int vertScrollWidth = SystemInformation.VerticalScrollBarWidth;
-            //list_Games.Padding = new Padding(0, 0, vertScrollWidth, 0);
+            list_games.Select();
+            list_games.AutoScroll = false;
 
-
-            if (args != null)
-            {
-                for (int i = 0; i < args.Length; i++)
-                {
+            if (args != null) {
+                for (int i = 0; i < args.Length; i++) {
                     string argument = args[i];
-                    if (string.IsNullOrEmpty(argument))
-                    {
+                    if (string.IsNullOrEmpty(argument)) {
                         continue;
                     }
 
                     string extension = Path.GetExtension(argument);
-                    if (extension.ToLower().EndsWith("nc"))
-                    {
-                        // try installing if user allows it
-                        if (MessageBox.Show("Would you like to install " + argument + "?", "Question", MessageBoxButtons.YesNo) == DialogResult.Yes)
-                        {
+                    if (extension.ToLower().EndsWith("nc")) {
+                        // try installing the package in the arguments if user allows it
+                        if (MessageBox.Show("Would you like to install " + argument + "?", "Question", MessageBoxButtons.YesNo) == DialogResult.Yes) {
                             gameManager.RepoManager.InstallPackage(argument);
                         }
                     }
                 }
             }
 
-            if (!gameManager.User.Options.RequestedToAssociateFormat)
-            {
+            if (!gameManager.User.Options.RequestedToAssociateFormat) {
                 gameManager.User.Options.RequestedToAssociateFormat = true;
 
-                if (MessageBox.Show("Would you like to associate Nucleus Package Files (*.nc) to the application?", "Question", MessageBoxButtons.YesNo) == DialogResult.Yes)
-                {
-                    string startLocation = Process.GetCurrentProcess().MainModule.FileName;
-                    if (!FileAssociations.SetAssociation(".nc", "NucleusCoop", "Nucleus Package Files", startLocation))
-                    {
-                        MessageBox.Show("Failed to set association");
-                        gameManager.User.Options.RequestedToAssociateFormat = false;
-                    }
+                //if (MessageBox.Show("Would you like to associate Nucleus Package Files (*.nc) and nuke:// links to the application?", "Question", MessageBoxButtons.YesNo) == DialogResult.Yes) {
+                string startLocation = Process.GetCurrentProcess().MainModule.FileName;
+                if (!RegistryUtil.SetAssociation(".nc", "NucleusCoop", "Nucleus Package Files", startLocation)) {
+                    //MessageBox.Show("Failed to set association");
+                    //gameManager.User.Options.RequestedToAssociateFormat = false;
                 }
+                RegistryUtil.RegisterUriScheme();
 
                 gameManager.User.Save();
             }
         }
 
-        protected override Size DefaultSize
-        {
-            get
-            {
-                return new Size(1070, 740);
-            }
+        protected override void OnResize(EventArgs e) {
+            base.OnResize(e);
+            UpdatePageSizes();
         }
 
-        protected override void OnGotFocus(EventArgs e)
-        {
+        protected override void OnGotFocus(EventArgs e) {
             base.OnGotFocus(e);
             this.TopMost = true;
             this.BringToFront();
-
             System.Diagnostics.Debug.WriteLine("Got Focus");
         }
 
-        protected override void WndProc(ref Message m)
-        {
-            //int msg = m.Msg;
-            //LogManager.Log(msg.ToString());
+        private bool refreshingGames;
 
-            base.WndProc(ref m);
-        }
+        public void RefreshGames() {
+            if (refreshingGames) {
+                return;
+            }
+            refreshingGames = true;
 
-        public void RefreshGames()
-        {
-            lock (controls)
-            {
-                foreach (var con in controls)
-                {
-                    if (con.Value != null)
-                    {
+            lock (controls) {
+                foreach (var con in controls) {
+                    if (con.Value != null) {
                         con.Value.Dispose();
                     }
                 }
-                this.list_Games.Controls.Clear();
-                this.list_Handlers.Controls.Clear();
+
+                this.list_games.Controls.Clear();
                 controls.Clear();
 
-                List<GameHandlerMetadata> handlers = gameManager.User.InstalledHandlers;
-                for (int i = 0; i < handlers.Count; i++)
-                {
-                    GameHandlerMetadata handler = handlers[i];
-                    NewGameHandler(handler);
+                // make menu before games
+                pkgManagerBtn = new GameControl();
+                pkgManagerBtn.Width = list_games.Width;
+                pkgManagerBtn.UpdateTitleText("Settings");
+                pkgManagerBtn.Image = Properties.Resources.nucleus;
+                //pkgManagerBtn.Image = FormGraphicsUtil.BuildCharToBitmap(new Size(40, 40), 30, Color.FromArgb(240, 240, 240), "⚙");
+                pkgManagerBtn.Click += PkgManagerBtn_Click;
+                this.list_games.Controls.Add(pkgManagerBtn);
+
+                //HorizontalLineControl line = new HorizontalLineControl();
+                //line.LineHorizontalPc = 100;
+                //line.Width = list_games.Width;
+                //line.LineHeight = 2;
+                //line.LineColor = Color.FromArgb(255, 41, 45, 47);
+                //this.list_games.Controls.Add(line);
+
+                TitleSeparator sep = new TitleSeparator();
+                sep.SetTitle("GAMES");
+                this.list_games.Controls.Add(sep);
+
+                var ordered = gameManager.GetInstalledGamesOrdered();
+                foreach (var pair in ordered) {
+                    NewUserGame(pair.Value);
                 }
 
-                List<UserGameInfo> games = gameManager.User.Games;
-                for (int i = 0; i < games.Count; i++)
-                {
-                    UserGameInfo game = games[i];
-                    NewUserGame(game);
-                }
-
-                if (games.Count == 0)
-                {
+                if (ordered.Count() == 0) {
                     noGamesPresent = true;
-                    GameControl con = new GameControl(null);
-                    con.Width = list_Games.Width;
-                    con.Text = "No games";
-                    this.list_Games.Controls.Add(con);
-                }
-
-                if (handlers.Count == 0)
-                {
-                    noGamesPresent = true;
-                    HandlerControl con = new HandlerControl(null);
-                    con.Width = list_Games.Width;
-                    con.Text = "No handlers";
-                    this.list_Handlers.Controls.Add(con);
+                    appPage = AppPage.NoGamesInstalled;
+                    GameControl con = new GameControl();
+                    con.Click += Con_Click;
+                    con.Width = list_games.Width;
+                    con.UpdateTitleText("No games");
+                    this.list_games.Controls.Add(con);
                 }
             }
 
+            // TODO: double-calling fixes some issues but is non-optimal
             DPIManager.ForceUpdate();
+            DPIManager.ForceUpdate();
+
+            UpdatePage();
+
             gameManager.User.Save();
+
+            // auto-click pkg manager to not open with nothing selected
+            PkgManagerBtn_Click(pkgManagerBtn, EventArgs.Empty);
+            pkgManagerBtn.RadioSelected();
+
+            refreshingGames = false;
         }
 
-        public void NewGameHandler(GameHandlerMetadata metadata)
-        {
-            if (noGamesPresent)
-            {
+        public GameControl NewUserGame(List<UserGameInfo> games) {
+            if (noGamesPresent) {
                 noGamesPresent = false;
                 RefreshGames();
-                return;
+                return null;
             }
 
             // get all Repository Game Infos
-            HandlerControl con = new HandlerControl(metadata);
-            con.Width = list_Games.Width;
-            this.list_Handlers.Controls.Add(con);
+            GameControl con = new GameControl();
+            con.SetUserGames(games);
+            con.Width = list_games.Width;
+            con.Click += Game_Click;
+            controls.Add(games[0].GameID, con);
+            this.list_games.Controls.Add(con);
+
+            gameManager.MetadataManager.GetIcon(games[0], (Bitmap bmp) => {
+                con.Image = bmp;
+            });
+
+
+            return con;
         }
 
-        public void NewUserGame(UserGameInfo game)
-        {
-            if (!game.IsGamePresent())
-            {
-                return;
+        private void Game_Click(object sender, EventArgs e) {
+            GameControl gameCon = (GameControl)sender;
+            Selected = gameCon;
+
+            var games = gameCon.UserGames;
+            if (games.Count > 1) {
+                // if there's more than 1 of the same game,
+                // show the different game executables we can launch
+                selectGameFolderPageControl.UpdateUsers(games, gameCon.Image);
+                appPage = AppPage.SelectGameFolder;
+            } else {
+                appPage = AppPage.GameHandler;
+                gamePageControl.ChangeSelectedGame(games[0]);
             }
 
-            if (noGamesPresent)
-            {
-                noGamesPresent = false;
-                RefreshGames();
-                return;
-            }
-
-            // get all Repository Game Infos
-            GameControl con = new GameControl(game);
-            con.Width = list_Games.Width;
-
-            controls.Add(game, con);
-            this.list_Games.Controls.Add(con);
-
-            ThreadPool.QueueUserWorkItem(GetIcon, game);
+            UpdatePage();
         }
 
-        protected override void OnShown(EventArgs e)
-        {
+        private void selectGameFolderPageControl_SelectedGame(UserGameInfo obj) {
+            gamePageControl.ChangeSelectedGame(obj);
+
+            appPage = AppPage.GameHandler;
+            UpdatePage();
+        }
+
+        private void Con_Click(object sender, EventArgs e) {
+            appPage = AppPage.NoGamesInstalled;
+            UpdatePage();
+        }
+
+        private void PkgManagerBtn_Click(object sender, EventArgs e) {
+            appPage = AppPage.PackageManager;
+            UpdatePage();
+        }
+
+        private void UpdatePage() {
+            selectGameFolderPageControl.Visible = false;
+            handlerManagerControl.Visible = false;
+            gamePageControl.Visible = false;
+            noGamesInstalledPageControl.Visible = false;
+
+            BasePageControl lastPage = currentPage;
+
+            // game btns
+            gamePageBrowserControl.Visible = false;
+
+            switch (appPage) {
+                case AppPage.SelectGameFolder:
+                    ChangeTitle(selectGameFolderPageControl.Title, selectGameFolderPageControl.Image);
+                    selectGameFolderPageControl.Visible = true;
+                    currentPage = selectGameFolderPageControl;
+                    break;
+                case AppPage.NoGamesInstalled:
+                    ChangeTitle(noGamesInstalledPageControl.Title, noGamesInstalledPageControl.Image);
+                    noGamesInstalledPageControl.Visible = true;
+                    currentPage = noGamesInstalledPageControl;
+                    break;
+                case AppPage.GameHandler:
+                    gamePageControl.Visible = true;
+                    gamePageBrowserControl.Visible = true;
+                    currentPage = gamePageControl;
+                    break;
+                case AppPage.PackageManager:
+                    ChangeTitle(handlerManagerControl.Title, handlerManagerControl.Image);
+                    handlerManagerControl.Visible = true;
+                    currentPage = handlerManagerControl;
+                    break;
+            }
+
+            if (lastPage != null && currentPage != lastPage) {
+                lastPage.UserLeft();
+            }
+
+            UpdatePageSizes();
+        }
+
+        private BasePageControl GetPageControl(AppPage appPage) {
+            switch (appPage) {
+                case AppPage.NoGamesInstalled:
+                    return this.noGamesInstalledPageControl;
+                case AppPage.GameHandler:
+                    return this.gamePageControl;
+                case AppPage.PackageManager:
+                    return this.handlerManagerControl;
+                default:
+                    return null;
+            }
+        }
+
+        private void UpdatePageSizes() {
+            // dont curse me
+            BasePageControl page = GetPageControl(this.appPage);
+            int listWidth = list_games.Size.Width;
+            int panelWidth = panel_formContent.Size.Width;
+            bool changed = false;
+
+            // fix 1 px border looking weird with the game handler paging system
+            if (appPage == AppPage.GameHandler) {
+                panel_allPages.Left = listWidth - 1;
+            } else {
+                panel_allPages.Left = listWidth;
+            }
+
+            if (page != null) {
+                page.Location = new Point(0, 0);
+
+                if (page.RequiredTitleBarWidth > 0) {
+                    changed = true;
+
+                    // Page requested a part of our title bar area to render things,
+                    // so we squish the title bar and update everyones sizes
+                    panel_pageTitle.Width = panelWidth - listWidth - page.RequiredTitleBarWidth;
+                    panel_pageTitle.Left = listWidth + page.RequiredTitleBarWidth;
+                    panel_allPages.Width = panelWidth - listWidth;
+                    panel_allPages.Height = panel_formContent.Height - titleBarControl.Height;
+                    panel_allPages.Top = titleBarControl.Height;
+
+                    // Force bring the title bar to front, so the now full size panel_allPages
+                    // doesnt show on top
+                    panel_pageTitle.BringToFront();
+                }
+
+                page.Size = panel_allPages.Size;
+            }
+
+            if (!changed) {
+                panel_pageTitle.Width = panelWidth - listWidth;
+                panel_pageTitle.Left = listWidth;
+                panel_allPages.Width = panelWidth - listWidth;
+                panel_allPages.Height = panel_formContent.Height - panel_pageTitle.Height - titleBarControl.Height;
+                panel_allPages.Top = panel_pageTitle.Height + titleBarControl.Height;
+            }
+        }
+
+        public void ChangeTitle(string newTitle, Image icon = null) {
+            gameNameControl.UpdateText(newTitle);
+            gameNameControl.Image = icon;
+        }
+
+        public void ChangeGameInfo(UserGameInfo userGameInfo) {
+            gameNameControl.GameInfo = userGameInfo;
+        }
+
+        protected override void OnShown(EventArgs e) {
             base.OnShown(e);
             RefreshGames();
 
             DPIManager.ForceUpdate();
         }
 
-        private void GetIcon(object state)
-        {
+        private void GetIcon(object state) {
             UserGameInfo game = (UserGameInfo)state;
             Icon icon = Shell32Interop.GetIcon(game.ExePath, false);
 
@@ -256,354 +360,24 @@ namespace Nucleus.Coop
             icon.Dispose();
             game.Icon = bmp;
 
-            lock (controls)
-            {
-                if (controls.ContainsKey(game))
-                {
-                    GameControl control = controls[game];
-                    control.Invoke((Action)delegate ()
-                    {
+            lock (controls) {
+                GameControl control;
+                if (controls.TryGetValue(game.GameID, out control)) {
+                    control.Invoke((Action)delegate () {
                         control.Image = game.Icon;
                     });
                 }
             }
         }
 
-
-        private void list_Games_SelectedChanged(Control arg1, Control arg2)
-        {
-            selectedControl = (GameControl)arg1;
-
-            if (selectedControl.UserGameInfo == null)
-            {
-                return;
-            }
-
-            panel_Steps.Visible = true;
-
-            UserGameInfo userGameInfo = selectedControl.UserGameInfo;
-            string gameId = selectedControl.UserGameInfo.GameID;
-
-            GameHandlerMetadata[] handlers = gameManager.RepoManager.GetInstalledHandlers(gameId);
-            if (handlers.Length == 0)
-            {
-                // uninstalled package perhaps?
-                return;
-            }
-
-            currentHandlers = handlers;
-
-            combo_Handlers.DataSource = handlers;
-            combo_Handlers.SelectedIndex = 0;
-        }
-
-        private void combo_Handlers_SelectedIndexChanged(object sender, EventArgs e)
-        {
-            if (combo_Handlers.SelectedIndex == -1)
-            {
-                return;
-            }
-
-            KillCurrentStep();
-
-            if (handlerDataManager != null)
-            {
-                // dispose
-                handlerDataManager.Dispose();
-                handlerDataManager = null;
-            }
-
-            try
-            {
-                selectedHandler = currentHandlers[combo_Handlers.SelectedIndex];
-                handlerDataManager = gameManager.RepoManager.ReadHandlerDataFromInstalledPackage(selectedHandler);
-                handlerData = handlerDataManager.HandlerData;
-
-                btn_Play.Enabled = false;
-
-                stepsList = new List<UserInputControl>();
-                stepsList.Add(positionsControl);
-                stepsList.Add(optionsControl);
-                if (handlerData.CustomSteps != null)
-                {
-                    for (int i = 0; i < handlerData.CustomSteps.Count; i++)
-                    {
-                        stepsList.Add(jsControl);
-                    }
-                }
-
-                currentProfile = new GameProfile();
-                currentProfile.InitializeDefault(handlerData);
-
-                gameNameControl.GameInfo = selectedControl.UserGameInfo;
-
-                GoToStep(0);
-            }
-            catch (Exception ex)
-            {
-                Debugger.Break();
-            }
-        }
-
-
-        private void EnablePlay()
-        {
-            btn_Play.Enabled = true;
-        }
-
-        private void StepCanPlay(UserControl obj, bool canProceed, bool autoProceed)
-        {
-            if (!canProceed)
-            {
-                btn_Next.Enabled = false;
-                return;
-            }
-
-            if (currentStepIndex + 1 > stepsList.Count - 1)
-            {
-                EnablePlay();
-                return;
-            }
-
-            if (autoProceed)
-            {
-                GoToStep(currentStepIndex + 1);
-            }
-            else
-            {
-                btn_Next.Enabled = true;
-            }
-        }
-
-        private void btnNext_Click(object sender, EventArgs e)
-        {
-            GoToStep(currentStepIndex + 1);
-        }
-
-        private void KillCurrentStep()
-        {
-            currentStep?.Ended();
-            this.panel_Steps.Controls.Clear();
-        }
-
-        private void GoToStep(int step)
-        {
-            btn_Previous.Enabled = step > 0;
-            if (step >= stepsList.Count)
-            {
-                return;
-            }
-
-            if (step >= 2)
-            {
-                // Custom steps
-                List<CustomStep> customSteps = handlerData.CustomSteps;
-                int customStepIndex = step - 2;
-                CustomStep customStep = customSteps[0];
-
-                if (customStep.Required)
-                {
-                    jsControl.CustomStep = customStep;
-                    jsControl.DataManager = handlerDataManager;
-                }
-                else
-                {
-                    EnablePlay();
-                    return;
-                }
-            }
-
-            KillCurrentStep();
-
-            currentStepIndex = step;
-            currentStep = stepsList[step];
-            currentStep.Size = panel_Steps.Size;
-            currentStep.Anchor = AnchorStyles.Left | AnchorStyles.Right | AnchorStyles.Top | AnchorStyles.Bottom;
-
-            currentStep.Initialize(handlerData, selectedControl.UserGameInfo, currentProfile);
-
-            btn_Next.Enabled = currentStep.CanProceed && step != stepsList.Count - 1;
-
-            panel_Steps.Controls.Add(currentStep);
-            currentStep.Size = panel_Steps.Size; // for some reason this line must exist or the PositionsControl get messed up
-
-            lbl_StepTitle.Text = currentStep.Title;
-        }
-
-        protected override void OnFormClosed(FormClosedEventArgs e)
-        {
-            base.OnFormClosed(e);
-
-            formClosing = true;
-            if (handler != null)
-            {
-                handler.End();
-            }
-        }
-
-        private void Overlay_OnStop()
-        {
+        private void Overlay_OnStop() {
             overlay.DisableOverlay();
-
-            if (handler != null)
-            {
-                handler.End();
-                return;
-            }
         }
 
-        private void btn_Play_Click(object sender, EventArgs e)
-        {
-            this.overlay.EnableOverlay(this);
-
-            handler = new GameHandler();
-            handler.Initialize(handlerDataManager, selectedControl.UserGameInfo, GameProfile.CleanClone(currentProfile));
-            handler.Ended += handler_Ended;
-
-            gameManager.Play(handler);
-            if (handlerData.HandlerInterval > 0)
-            {
-                handlerThread = new Thread(UpdateGameManager);
-                handlerThread.Start();
-            }
-
-            WindowState = FormWindowState.Minimized;
-        }
-
-        private void handler_Ended()
-        {
-            handler = null;
-            if (handlerThread != null)
-            {
-                handlerThread.Abort();
-                handlerThread = null;
-            }
-        }
-
-        private void UpdateGameManager(object state)
-        {
-            for (; ; )
-            {
-                try
-                {
-                    if (gameManager == null || formClosing || handler == null)
-                    {
-                        break;
-                    }
-
-                    string error = gameManager.Error;
-                    if (!string.IsNullOrEmpty(error))
-                    {
-                        MessageBox.Show(error, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                        handler_Ended();
-                        return;
-                    }
-
-                    handler.Tick(handlerData.HandlerInterval);
-                    Thread.Sleep(TimeSpan.FromMilliseconds(handlerData.HandlerInterval));
-                }
-                catch (ThreadAbortException)
-                {
-                    return;
-                }
-                catch { }
-            }
-        }
-
-        private void arrow_Back_Click(object sender, EventArgs e)
-        {
-            currentStepIndex--;
-            if (currentStepIndex < 0)
-            {
-                currentStepIndex = 0;
-                return;
-            }
-            GoToStep(currentStepIndex);
-        }
-
-        private void arrow_Next_Click(object sender, EventArgs e)
-        {
-            currentStepIndex = Math.Min(currentStepIndex++, stepsList.Count - 1);
-            GoToStep(currentStepIndex);
-        }
-
-        private void btn_Browse_Click(object sender, EventArgs e)
-        {
-            using (OpenFileDialog open = new OpenFileDialog())
-            {
-                open.Filter = "Game Executable Files|*.exe";
-                if (open.ShowDialog() == DialogResult.OK)
-                {
-                    string path = open.FileName;
-
-                    List<GameHandlerMetadata> allGames = gameManager.User.InstalledHandlers;
-
-                    GameList list = new GameList(allGames);
-                    DPIManager.ForceUpdate();
-
-                    if (list.ShowDialog() == DialogResult.OK)
-                    {
-                        GameHandlerMetadata selected = list.Selected;
-                        UserGameInfo game = gameManager.TryAddGame(path, list.Selected);
-
-                        if (game == null)
-                        {
-                            MessageBox.Show("Game already in your library!");
-                        }
-                        else
-                        {
-                            MessageBox.Show("Game accepted as ID " + game.GameID);
-                            RefreshGames();
-                        }
-                    }
-                }
-            }
-        }
-
-        private void btnAutoSearch_Click(object sender, EventArgs e)
-        {
-            if (form != null)
-            {
-                return;
-            }
-
-            form = new SearchDisksForm(this);
-            //DPIManager.AddForm(form);
-
-            form.FormClosed += Form_FormClosed;
-            form.Show();
-            SetUpForm(form);
-
-            DPIManager.ForceUpdate();
-        }
-
-        private void Form_FormClosed(object sender, FormClosedEventArgs e)
-        {
-            form = null;
-        }
-
-        private void btnShowTaskbar_Click(object sender, EventArgs e)
-        {
+        private void btnShowTaskbar_Click(object sender, EventArgs e) {
             User32Util.ShowTaskBar();
         }
 
-        private void btn_Install_Click(object sender, EventArgs e)
-        {
-            using (OpenFileDialog open = new OpenFileDialog())
-            {
-                open.Multiselect = true;
-                open.Filter = "Nucleus Coop Package Files|*.nc";
-                if (open.ShowDialog() == DialogResult.OK)
-                {
-                    string[] paths = open.FileNames;
-                    for (int i = 0; i < paths.Length; i++)
-                    {
-                        gameManager.RepoManager.InstallPackage(paths[i]);
-                    }
 
-                    RefreshGames();
-                }
-            }
-        }
     }
 }

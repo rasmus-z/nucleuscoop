@@ -10,6 +10,8 @@ namespace Nucleus.Gaming.Coop
     /// </summary>
     public class GameHookData
     {
+        public bool ClipMouse { get; set; }
+
         /// <summary>
         /// If the game should be run using our custom version of x360ce for gamepad control.
         /// Enabled by default as the majority of our games need it
@@ -50,12 +52,19 @@ namespace Nucleus.Gaming.Coop
         /// If our custom dll should set the window size and position locally, instead of the handler
         /// (inconsistent with some window sizes, look at Borderlands2.js for an example usage)
         /// </summary>
-        [Dynamic]
-        public bool SetWindowSize { get; set; }
+        //[Dynamic]
+        //public bool SetWindowSize { get; set; } = true;
+
+        /// <summary>
+        /// If our custom dll should set the window size and position locally, instead of the handler
+        /// (inconsistent with some window sizes, look at Borderlands2.js for an example usage)
+        /// </summary>
+        //[Dynamic]
+        //public bool SetWindowPosition { get; set; }
 
         /// <summary>
         /// If our custom DLL should hook into the game's window and fake Window's events
-        /// so we never leave focus. Depends on the ForceFocusWindowName variable
+        /// so we never leave focus. Depends on the ForceFocusWindowRegex variable
         /// (used for games that don't work when out of focus. See Borderlands.js)
         /// </summary>
         [Dynamic]
@@ -67,11 +76,12 @@ namespace Nucleus.Gaming.Coop
         /// This is used in a very specific case even out
         /// </summary>
         [Dynamic]
-        public string ForceFocusWindowName { get; set; } = "";
+        public string ForceFocusWindowRegex { get; set; } = "";
 
-
-        public bool BlockMouseEvents { get; set; } = true;
-        public bool BlockKeyboardEvents { get; set; } = true;
-        public bool BlockInputEvents { get; set; } = true;
+        /// <summary>
+        /// If the XInput hook dll should remove the height of the title bar
+        /// when scaling the application
+        /// </summary>
+        //public bool RemoveTitleBar { get; set; }
     }
 }

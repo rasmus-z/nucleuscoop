@@ -105,6 +105,7 @@ Game.FileSymlinkExclusions = [
     "server.dll"
 ];
 
+Game.PlatformVersion = 10;
 Game.SteamID = "563560";
 Game.GameID = "563560";
 Game.HandlerInterval = 100; // 10 FPS handler
@@ -121,13 +122,13 @@ Game.WorkingFolder = "bin";
 Game.StartArguments = "-novid -insecure -window";
 Game.MaxPlayersOneMonitor = 8;
 Game.MaxPlayers = 8;
-Game.Hook.ForceFocus = false;
-Game.Hook.ForceFocusWindowName = "Alien Swarm: Reactive Drop";
+Game.Hook.ForceFocus = true;
+Game.Hook.ForceFocusWindowRegex = "Alien Swarm";
 Game.Hook.DInputEnabled = false;
 Game.Hook.DInputForceDisable = true;
 Game.Hook.XInputEnabled = true;
 Game.Hook.XInputReroute = false;
-Game.Hook.CustomDllEnabled = true;
+Game.KeyboardPlayerFirst = true;
 
 // this game will multiply the values on the creators Update
 // ... but is it only in the creators update?
@@ -136,48 +137,48 @@ Game.DPIHandling = DPIHandling.InvScaled;
 Game.OnPlay.Callback(function () {
     // Only enable setting the window size on the XInput hook dll
     // when its dual vertical, as it doenst work 100% of the time on DualHorizontal
-    Context.Hook.SetWindowSize = Player.Owner.IsDualVertical();
-    Context.Hook.ForceFocus = false;//!Player.IsKeyboardPlayer;
+    //Context.Hook.SetWindowSize = Player.Owner.IsDualVertical();
+    //Context.Hook.ForceFocus = false;//!Player.IsKeyboardPlayer;
 
-    var saveSrc = Context.CombinePath(Context.RootInstallFolder, "reactivedrop\\cfg\\video.txt");
-    var savePath = Context.CombinePath(Context.RootFolder, "reactivedrop\\cfg\\video.txt");
+    var saveSrc = Context.CombinePath(Context.InstallFolder, "reactivedrop\\cfg\\video.txt");
+    var savePath = Context.CombinePath(Context.InstanceFolder, "reactivedrop\\cfg\\video.txt");
     Context.ModifySaveFile(saveSrc, savePath, SaveType.CFG, [
-        Context.NewCfgSaveInfo("VideoConfig", "setting.fullscreen", "0"),
-        Context.NewCfgSaveInfo("VideoConfig", "setting.defaultres", Math.max(640, Context.Width)),
-        Context.NewCfgSaveInfo("VideoConfig", "setting.defaultresheight", Math.max(360, Context.Height)),
-        Context.NewCfgSaveInfo("VideoConfig", "setting.nowindowborder", "0"),
+        Context.NewSaveInfo("VideoConfig", "setting.fullscreen", "0"),
+        Context.NewSaveInfo("VideoConfig", "setting.defaultres", Math.max(640, Context.Width)),
+        Context.NewSaveInfo("VideoConfig", "setting.defaultresheight", Math.max(360, Context.Height)),
+        Context.NewSaveInfo("VideoConfig", "setting.nowindowborder", "0"),
     ]);
     
     //copy config.cfg
-    Context.CopyFile(Context.CombinePath(Context.RootInstallFolder, "reactivedrop\\cfg\\config.cfg"),
-        Context.CombinePath(Context.RootFolder, "reactivedrop\\cfg\\config.cfg"),
+    Context.CopyFile(Context.CombinePath(Context.InstallFolder, "reactivedrop\\cfg\\config.cfg"),
+        Context.CombinePath(Context.InstanceFolder, "reactivedrop\\cfg\\config.cfg"),
         true);
 
     //copy steam.inf
-    Context.CopyFile(Context.CombinePath(Context.RootInstallFolder, "reactivedrop\\steam.inf"),
-        Context.CombinePath(Context.RootFolder, "reactivedrop\\steam.inf"),
+    Context.CopyFile(Context.CombinePath(Context.InstallFolder, "reactivedrop\\steam.inf"),
+        Context.CombinePath(Context.InstanceFolder, "reactivedrop\\steam.inf"),
         true);
 
     // TODO: how to update these if it comes the case?
 
     //patch dlls
     //patch engine no sleep
-    Context.PatchFile(Context.CombinePath(Context.RootInstallFolder, "bin\\engine.dll"),
-        Context.CombinePath(Context.RootFolder, "bin\\engine.dll"), 
+    Context.PatchFile(Context.CombinePath(Context.InstallFolder, "bin\\engine.dll"),
+        Context.CombinePath(Context.InstanceFolder, "bin\\engine.dll"), 
         [ 0x8B, 0x01, 0x8B, 0x50, 0x3C, 0xFF, 0xD2, 0x84, 0xC0, 0x75, 0x1A ],
         [ 0x8B, 0x01, 0x8B, 0x50, 0x3C, 0x90, 0x90 ]);
     //patch select weapon for players in briefing
-    Context.PatchFile(Context.CombinePath(Context.RootInstallFolder, "reactivedrop\\bin\\client.dll"),
-        Context.CombinePath(Context.RootFolder, "reactivedrop\\bin\\client.dll"),
+    Context.PatchFile(Context.CombinePath(Context.InstallFolder, "reactivedrop\\bin\\client.dll"),
+        Context.CombinePath(Context.InstanceFolder, "reactivedrop\\bin\\client.dll"),
         [ 0x0F, 0x84, 0xA8, 0x00, 0x00, 0x00, 0x53, 0x8D ],
         [ 0x90, 0x90, 0x90, 0x90, 0x90, 0x90 ]);
     //patch select weapon for players in briefing
-    Context.PatchFile(Context.CombinePath(Context.RootInstallFolder, "reactivedrop\\bin\\server.dll"),
-        Context.CombinePath(Context.RootFolder, "reactivedrop\\bin\\server.dll"),
+    Context.PatchFile(Context.CombinePath(Context.InstallFolder, "reactivedrop\\bin\\server.dll"),
+        Context.CombinePath(Context.InstanceFolder, "reactivedrop\\bin\\server.dll"),
         [ 0x74, 0x12, 0x46, 0x83, 0xFE, 0x20 ],
         [ 0xEB ]);
 
-    var autoExec = Context.GetFolder(Folder.InstancedGameFolder) + "\\reactivedrop\\cfg\\autoexec.cfg";
+    var autoExec = Context.InstanceFolder + "\\reactivedrop\\cfg\\autoexec.cfg";
     var lines = [
         "sv_lan 1",
         "sv_allow_lobby_connect_only 0",
@@ -186,10 +187,15 @@ Game.OnPlay.Callback(function () {
         //"fps_max 999"
     ];
 
+    map = Context.Options["MapID"].Console;
     if (Player.IsKeyboardPlayer) {
         lines.push("joystick 0");
         lines.push("sk_autoaim_mode 1");
         //lines.push("exec undo360controller.cfg");
+
+        if (map !== "") {
+            lines.push("map " + map);
+        }
     }
     else {
         lines.push("exec 360controller_pc.cfg");
@@ -208,22 +214,26 @@ Game.OnPlay.Callback(function () {
         lines.push("bind \"POV_DOWN\" \"asw_squad_hotbar 4\"");
         lines.push("bind \"DOWN\" \"asw_squad_hotbar 4\"");
         //lines.push("");
-    }
-    
-    var map = Context.Options["MapID"].Console;
-    if (Context.PlayerID == 0) {
-        if (map != "") {
-            lines.push("map " + map);
+
+        if (Context.HasKeyboardPlayer()) {
+            lines.push("connect " + Context.User.GetLocalIP());
+        } else {
+            if (Context.PlayerID == 0) {
+                if (map !== "") {
+                    lines.push("map " + map);
+                }
+            } else {
+                lines.push("connect " + Context.User.GetLocalIP());
+            }
         }
-    } else {
-        lines.push("connect " + Context.User.GetLocalIP());
     }
 
-    if (map.indexOf("dm_") === 0 && !Player.IsKeyboardPlayer) {
-        //for deathmatch map use BACK button to show/close choose marine panel
-        lines.push("bind \"JOY7\" \"cl_select_loadout\"");
-        lines.push("bind \"BACK\" \"cl_select_loadout\"");
-    }
+    Context.LogLine(map);
+    //if (map.indexOf("dm_") === 0 && !Player.IsKeyboardPlayer) {
+    //    //for deathmatch map use BACK button to show/close choose marine panel
+    //    lines.push("bind \"JOY7\" \"cl_select_loadout\"");
+    //    lines.push("bind \"BACK\" \"cl_select_loadout\"");
+    //}
 
     Context.WriteTextFile(autoExec, lines);
 });
